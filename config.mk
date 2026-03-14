@@ -15,3 +15,12 @@ XLIBS =
 #XLIBS = xcb xcb-icccm
 
 CC = gcc
+
+# Personal-build friendly defaults focused on runtime performance and
+# smaller/faster links. Override from environment if needed.
+CFLAGS ?= -O2 -march=native -pipe -fomit-frame-pointer -flto=auto
+LDFLAGS ?= -Wl,-O1,--as-needed -flto=auto
+
+# Optional install artifacts.
+INSTALL_MANPAGE ?= 0
+INSTALL_SESSION_FILE ?= 1
