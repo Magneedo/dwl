@@ -106,7 +106,7 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 /* commands */
 static const char *term[]            = { "footclient", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
-static const char *brave[]           = { "brave", NULL };
+static const char *brave[]           = { "brave-origin", NULL };
 static const char *wlogoutcmd[]      = { "wlogout", "-b", "2", NULL };
 static const char *swaylockcmd[]     = { "swaylock", NULL };
 static const char *br_down[]         = { "brightnessctl", "-q", "set",     "1%-",        NULL };
