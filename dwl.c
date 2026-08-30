@@ -74,12 +74,13 @@
 #define MAX(A, B)               ((A) > (B) ? (A) : (B))
 #define MIN(A, B)               ((A) < (B) ? (A) : (B))
 #define CLEANMASK(mask)         (mask & ~WLR_MODIFIER_CAPS)
-#define VISIBLEON(C, M)         ((M) && (C)->mon == (M) && ((C)->tags & (M)->tagset[(M)->seltags]))
+#define VISIBLEON(C, M)         ((M) && (C)->mon == (M) && ((C)->tags & (M)->tagset[(M)->seltags]) && !(C)->swallowedby)
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define END(A)                  ((A) + LENGTH(A))
 #define TAGMASK                 ((1u << TAGCOUNT) - 1)
 #define LISTEN(E, L, H)         wl_signal_add((E), ((L)->notify = (H), (L)))
 #define LISTEN_STATIC(E, H)     do { struct wl_listener *_l = ecalloc(1, sizeof(*_l)); _l->notify = (H); wl_signal_add((E), _l); } while (0)
+#define BORDERPX(C)             (borderpx + ((C)->swallowing ? (C)->swallowing->bw : 0))
 
 /* enums */
 enum { CurNormal, CurPressed, CurMove, CurResize }; /* cursor */
@@ -101,17 +102,17 @@ typedef struct {
 } Button;
 
 typedef struct Monitor Monitor;
-typedef struct {
-	/* Must keep this field first */
+typedef struct Client Client;
+struct Client {
+	/* Must keep these three elements in this order */
 	unsigned int type; /* XDGShell or X11* */
-
+	struct wlr_box geom; /* layout-relative, includes border */
 	Monitor *mon;
 	struct wlr_scene_tree *scene;
 	struct wlr_scene_rect *border[4]; /* top, bottom, left, right */
 	struct wlr_scene_tree *scene_surface;
 	struct wl_list link;
 	struct wl_list flink;
-	struct wlr_box geom; /* layout-relative, includes border */
 	struct wlr_box prev; /* layout-relative, includes border */
 	struct wlr_box bounds; /* only width and height are used */
 	union {
@@ -138,8 +139,12 @@ typedef struct {
 	unsigned int bw;
 	uint32_t tags;
 	int isfloating, isurgent, isfullscreen;
+	int isterm, noswallow;
 	uint32_t resize; /* configure serial of a pending resize */
-} Client;
+	pid_t pid;
+	Client *swallowing;  /* client being hidden */
+	Client *swallowedby;
+};
 
 typedef struct {
 	uint32_t mod;
@@ -227,6 +232,8 @@ typedef struct {
 	const char *title;
 	uint32_t tags;
 	int isfloating;
+	int isterm;
+	int noswallow;
 	int monitor;
 } Rule;
 
@@ -299,7 +306,6 @@ static void killclient(const Arg *arg);
 static void locksession(struct wl_listener *listener, void *data);
 static void mapnotify(struct wl_listener *listener, void *data);
 static void maximizenotify(struct wl_listener *listener, void *data);
-static void monocle(Monitor *m);
 static void motionabsolute(struct wl_listener *listener, void *data);
 static void motionnotify(uint32_t time, struct wlr_input_device *device, double sx,
 		double sy, double sx_unaccel, double sy_unaccel);
@@ -308,6 +314,7 @@ static void moveresize(const Arg *arg);
 static void outputmgrapply(struct wl_listener *listener, void *data);
 static void outputmgrapplyortest(struct wlr_output_configuration_v1 *config, int test);
 static void outputmgrtest(struct wl_listener *listener, void *data);
+static pid_t parentpid(pid_t pid);
 static void pointerfocus(Client *c, struct wlr_surface *surface,
 		double sx, double sy, uint32_t time);
 static void printstatus(void);
@@ -323,7 +330,6 @@ static void setcursor(struct wl_listener *listener, void *data);
 static void setcursorshape(struct wl_listener *listener, void *data);
 static void setfloating(Client *c, int floating);
 static void setfullscreen(Client *c, int fullscreen);
-static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
 static void setmon(Client *c, Monitor *m, uint32_t newtags);
 static void setpsel(struct wl_listener *listener, void *data);
@@ -331,11 +337,15 @@ static void setsel(struct wl_listener *listener, void *data);
 static void setup(void);
 static void spawn(const Arg *arg);
 static void startdrag(struct wl_listener *listener, void *data);
+static void swallow(Client *c, Client *toswallow);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
+static Client *termforwin(Client *c);
 static void tile(Monitor *m);
 static void togglefloating(const Arg *arg);
 static void togglefullscreen(const Arg *arg);
+static void toggleswallow(const Arg *arg);
+static void toggleautoswallow(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
 static void unlocksession(struct wl_listener *listener, void *data);
@@ -486,11 +496,15 @@ applyrules(Client *c)
 	appid = client_get_appid(c);
 	title = client_get_title(c);
 
+	c->pid = client_get_pid(c);
+
 	for (r = rules; r < END(rules); r++) {
 		if ((!r->title || strstr(title, r->title))
 				&& (!r->id || strstr(appid, r->id))) {
 			c->isfloating = r->isfloating;
 			newtags |= r->tags;
+			c->isterm = r->isterm;
+			c->noswallow = r->noswallow;
 			i = 0;
 			wl_list_for_each(m, &mons, link) {
 				if (r->monitor == i++)
@@ -500,6 +514,12 @@ applyrules(Client *c)
 	}
 
 	c->isfloating |= client_is_float_type(c);
+	if (enableautoswallow && !c->noswallow && !c->isfloating &&
+			!c->surface.xdg->initial_commit) {
+		Client *p = termforwin(c);
+		if (p)
+			swallow(c, p);
+	}
 	setmon(c, mon, newtags);
 }
 
@@ -1820,24 +1840,7 @@ maximizenotify(struct wl_listener *listener, void *data)
 		wlr_xdg_surface_schedule_configure(c->surface.xdg);
 }
 
-void
-monocle(Monitor *m)
-{
-	Client *c;
-	int n = 0;
-
-	wl_list_for_each(c, &clients, link) {
-		if (!VISIBLEON(c, m) || c->isfloating || c->isfullscreen)
-			continue;
-		resize(c, m->w, 0);
-		n++;
-	}
-	if (n)
-		snprintf(m->ltsymbol, LENGTH(m->ltsymbol), "[%d]", n);
-	if ((c = focustop(m)))
-		wlr_scene_node_raise_to_top(&c->scene->node);
-}
-
+/**/
 void
 motionabsolute(struct wl_listener *listener, void *data)
 {
@@ -2055,6 +2058,20 @@ outputmgrtest(struct wl_listener *listener, void *data)
 {
 	struct wlr_output_configuration_v1 *config = data;
 	outputmgrapplyortest(config, 1);
+}
+
+pid_t
+parentpid(pid_t pid)
+{
+	unsigned int v = 0;
+	FILE *f;
+	char buf[256];
+	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)pid);
+	if (!(f = fopen(buf, "r")))
+		return 0;
+	fscanf(f, "%*u %*s %*c %u", &v);
+	fclose(f);
+	return (pid_t)v;
 }
 
 void
@@ -2351,7 +2368,7 @@ setfullscreen(Client *c, int fullscreen)
 	c->isfullscreen = fullscreen;
 	if (!c->mon || !client_surface(c)->mapped)
 		return;
-	c->bw = fullscreen ? 0 : borderpx;
+	c->bw = fullscreen ? 0 : BORDERPX(c);
 	client_set_fullscreen(c, fullscreen);
 	wlr_scene_node_reparent(&c->scene->node, layers[c->isfullscreen
 			? LyrFS : c->isfloating ? LyrFloat : LyrTile]);
@@ -2365,20 +2382,6 @@ setfullscreen(Client *c, int fullscreen)
 		resize(c, c->prev, 0);
 	}
 	arrange(c->mon);
-	printstatus();
-}
-
-void
-setlayout(const Arg *arg)
-{
-	if (!selmon)
-		return;
-	if (!arg || !arg->v || arg->v != selmon->lt[selmon->sellt])
-		selmon->sellt ^= 1;
-	if (arg && arg->v)
-		selmon->lt[selmon->sellt] = (Layout *)arg->v;
-	strncpy(selmon->ltsymbol, selmon->lt[selmon->sellt]->symbol, LENGTH(selmon->ltsymbol));
-	arrange(selmon);
 	printstatus();
 }
 
@@ -2418,6 +2421,9 @@ setmon(Client *c, Monitor *m, uint32_t newtags)
 		setfloating(c, c->isfloating);
 	}
 	focusclient(focustop(selmon), 1);
+
+	if (c->swallowing)
+		setmon(c->swallowing, m, newtags);
 }
 
 void
@@ -2689,6 +2695,44 @@ startdrag(struct wl_listener *listener, void *data)
 }
 
 void
+swallow(Client *c, Client *toswallow)
+{
+	/* Do not allow a client to swallow itself */
+	if (c == toswallow)
+		return;
+
+	/* Swallow */
+	if (toswallow && !c->swallowing) {
+		c->swallowing = toswallow;
+		toswallow->swallowedby = c;
+		toswallow->mon = c->mon;
+		toswallow->mon = c->mon;
+		wl_list_remove(&c->link);
+		wl_list_insert(&c->swallowing->link, &c->link);
+		wl_list_remove(&c->flink);
+		wl_list_insert(&c->swallowing->flink, &c->flink);
+		c->bw = BORDERPX(c);
+		c->tags = toswallow->tags;
+		c->isfloating = toswallow->isfloating;
+		c->geom = toswallow->geom;
+		setfullscreen(toswallow, 0);
+	}
+
+	/* Unswallow */
+	else if (c->swallowing) {
+		wl_list_remove(&c->swallowing->link);
+		wl_list_insert(&c->link, &c->swallowing->link);
+		wl_list_remove(&c->swallowing->flink);
+		wl_list_insert(&c->flink, &c->swallowing->flink);
+		c->swallowing->tags = c->tags;
+		c->swallowing->swallowedby = NULL;
+		c->swallowing = NULL;
+		c->bw = BORDERPX(c);
+		setfullscreen(c, 0);
+	}
+}
+
+void
 tag(const Arg *arg)
 {
 	Client *sel = focustop(selmon);
@@ -2707,6 +2751,40 @@ tagmon(const Arg *arg)
 	Client *sel = focustop(selmon);
 	if (sel)
 		setmon(sel, dirtomon(arg->i), 0);
+}
+
+Client *
+termforwin(Client *c)
+{
+	Client *p;
+	pid_t pid;
+	pid_t pids[32];
+	size_t i, pids_len;
+
+	if (!c->pid || c->isterm)
+		return NULL;
+
+	/* Get all parent pids */
+	pids_len = 0;
+	pid = c->pid;
+	while (pids_len < LENGTH(pids)) {
+		pid = parentpid(pid);
+		if (!pid)
+			break;
+		pids[pids_len++] = pid;
+	}
+
+	/* Find closest parent */
+	for (i = 0; i < pids_len; i++) {
+		wl_list_for_each(p, &clients, link) {
+			if (!p->pid || !p->isterm || p->swallowedby)
+				continue;
+			if (pids[i] == p->pid)
+				return p;
+		}
+	}
+
+	return NULL;
 }
 
 void
@@ -2758,6 +2836,32 @@ togglefullscreen(const Arg *arg)
 	Client *sel = focustop(selmon);
 	if (sel)
 		setfullscreen(sel, !sel->isfullscreen);
+}
+
+void
+toggleswallow(const Arg *arg)
+{
+	Client *c, *sel = focustop(selmon);
+	if (!sel)
+		return;
+
+	if (sel->swallowing) {
+		swallow(sel, NULL);
+	} else {
+		wl_list_for_each(c, &sel->flink, flink) {
+			if (&c->flink == &fstack)
+				continue; /* wrap past the sentinel node */
+			if (VISIBLEON(c, selmon))
+				break; /* found it */
+		}
+		swallow(sel, c);
+	}
+}
+
+void
+toggleautoswallow(const Arg *arg)
+{
+	enableautoswallow = !enableautoswallow;
 }
 
 void
@@ -2818,6 +2922,12 @@ unmapnotify(struct wl_listener *listener, void *data)
 	if (c == grabc) {
 		cursor_mode = CurNormal;
 		grabc = NULL;
+	}
+
+	if (c->swallowing) {
+		swallow(c, NULL);
+	} else if (c->swallowedby) {
+		swallow(c->swallowedby, NULL);
 	}
 
 	if (client_is_unmanaged(c)) {
