@@ -1,6 +1,9 @@
 dwl
 *.o
-*-protocol.c
-*-protocol.h
-.ccls-cache
-config.h
+
+# generated protocol headers from make
+cursor-shape-v1-protocol.h
+pointer-constraints-unstable-v1-protocol.h
+wlr-layer-shell-unstable-v1-protocol.h
+wlr-output-power-management-unstable-v1-protocol.h
+xdg-shell-protocol.h
