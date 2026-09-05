@@ -1,5 +1,6 @@
 dwl
 *.o
+tests/swallow
 
 # generated protocol headers from make
 cursor-shape-v1-protocol.h

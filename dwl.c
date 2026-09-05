@@ -492,6 +492,7 @@ applyrules(Client *c)
 	int i;
 	const Rule *r;
 	Monitor *mon = selmon, *m;
+	Client *p;
 
 	appid = client_get_appid(c);
 	title = client_get_title(c);
@@ -515,10 +516,9 @@ applyrules(Client *c)
 
 	c->isfloating |= client_is_float_type(c);
 	if (enableautoswallow && !c->noswallow && !c->isfloating &&
-			!c->surface.xdg->initial_commit) {
-		Client *p = termforwin(c);
-		if (p)
-			swallow(c, p);
+			client_surface(c)->mapped && (p = termforwin(c))) {
+		swallow(c, p);
+		return;
 	}
 	setmon(c, mon, newtags);
 }
@@ -2063,15 +2063,24 @@ outputmgrtest(struct wl_listener *listener, void *data)
 pid_t
 parentpid(pid_t pid)
 {
-	unsigned int v = 0;
+	long parent = 0;
 	FILE *f;
-	char buf[256];
-	snprintf(buf, sizeof(buf) - 1, "/proc/%u/stat", (unsigned)pid);
+	char buf[256], *comm_end;
+	size_t len;
+
+	if (pid <= 0)
+		return 0;
+	snprintf(buf, sizeof(buf), "/proc/%ld/stat", (long)pid);
 	if (!(f = fopen(buf, "r")))
 		return 0;
-	fscanf(f, "%*u %*s %*c %u", &v);
+	len = fread(buf, 1, sizeof(buf) - 1, f);
 	fclose(f);
-	return (pid_t)v;
+	buf[len] = '\0';
+	/* The parenthesized process name can contain spaces, ')' and newlines. */
+	comm_end = strrchr(buf, ')');
+	if (!comm_end || sscanf(comm_end + 1, " %*c %ld", &parent) != 1)
+		return 0;
+	return parent > 0 ? (pid_t)parent : 0;
 }
 
 void
@@ -2697,25 +2706,33 @@ startdrag(struct wl_listener *listener, void *data)
 void
 swallow(Client *c, Client *toswallow)
 {
-	/* Do not allow a client to swallow itself */
-	if (c == toswallow)
-		return;
+	Client *p;
 
 	/* Swallow */
-	if (toswallow && !c->swallowing) {
+	if (toswallow) {
+		/* Keep each client in at most one chain, without creating cycles. */
+		if (c == toswallow || c->swallowing || c->swallowedby
+				|| toswallow->swallowedby || !toswallow->mon)
+			return;
+		if (toswallow->isfullscreen)
+			setfullscreen(toswallow, 0);
 		c->swallowing = toswallow;
 		toswallow->swallowedby = c;
-		toswallow->mon = c->mon;
-		toswallow->mon = c->mon;
 		wl_list_remove(&c->link);
 		wl_list_insert(&c->swallowing->link, &c->link);
 		wl_list_remove(&c->flink);
 		wl_list_insert(&c->swallowing->flink, &c->flink);
-		c->bw = BORDERPX(c);
+		c->bw = c->isfullscreen ? 0 : BORDERPX(c);
 		c->tags = toswallow->tags;
 		c->isfloating = toswallow->isfloating;
 		c->geom = toswallow->geom;
-		setfullscreen(toswallow, 0);
+		if (c->mon != toswallow->mon)
+			setmon(c, toswallow->mon, toswallow->tags);
+		else {
+			c->prev = c->geom;
+			setfullscreen(c, c->isfullscreen);
+			setfloating(c, c->isfloating);
+		}
 	}
 
 	/* Unswallow */
@@ -2728,8 +2745,20 @@ swallow(Client *c, Client *toswallow)
 		c->swallowing->swallowedby = NULL;
 		c->swallowing = NULL;
 		c->bw = BORDERPX(c);
-		setfullscreen(c, 0);
+		if (c->isfullscreen)
+			setfullscreen(c, 0);
 	}
+	else
+		return;
+
+	/* Removing an inner client also changes every enclosing border. */
+	for (p = c; p; p = p->swallowedby) {
+		p->bw = p->isfullscreen ? 0 : BORDERPX(p);
+		resize(p, p->geom, 0);
+	}
+	if (c->mon)
+		arrange(c->mon);
+	printstatus();
 }
 
 void
@@ -2777,7 +2806,7 @@ termforwin(Client *c)
 	/* Find closest parent */
 	for (i = 0; i < pids_len; i++) {
 		wl_list_for_each(p, &clients, link) {
-			if (!p->pid || !p->isterm || p->swallowedby)
+			if (!p->pid || !p->isterm || p->swallowedby || !p->mon)
 				continue;
 			if (pids[i] == p->pid)
 				return p;
@@ -2856,6 +2885,7 @@ toggleswallow(const Arg *arg)
 		}
 		swallow(sel, c);
 	}
+	focusclient(sel, 1);
 }
 
 void
@@ -2926,7 +2956,8 @@ unmapnotify(struct wl_listener *listener, void *data)
 
 	if (c->swallowing) {
 		swallow(c, NULL);
-	} else if (c->swallowedby) {
+	}
+	if (c->swallowedby) {
 		swallow(c->swallowedby, NULL);
 	}
 
@@ -3322,4 +3353,5 @@ main(int argc, char *argv[])
 
 usage:
 	die("Usage: %s [-v] [-d] [-s startup command]", argv[0]);
+	return EXIT_FAILURE;
 }
