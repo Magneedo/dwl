@@ -105,6 +105,7 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 
 /* commands */
 static const char *term[]            = { "footclient", NULL };
+static const char *lf[]              = { "footclient", "lf", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
 static const char *brave[]           = { "brave-origin", NULL };
 static const char *wlogoutcmd[]      = { "wlogout", "-b", "2", NULL };
@@ -121,7 +122,8 @@ static const char *screenshots[]     = { "/home/bren/.local/bin/screenshots", NU
 static const Key keys[] = {
 	/* modifier                  key                 function          argument */
 	{ MODKEY,                    XKB_KEY_Return,     spawn,            {.v = term} },
-	{ MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
+    { MODKEY,                    XKB_KEY_e,          spawn,            {.v = lf} },
+    { MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
 	{ MODKEY,                    XKB_KEY_b,          spawn,            {.v = brave} },
 	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = wlogoutcmd } },
     { MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_L,          spawn,            {.v = swaylockcmd } },
@@ -141,6 +143,7 @@ static const Key keys[] = {
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,       tagmon,           {.i = WLR_DIRECTION_LEFT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_greater,    tagmon,           {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          quit,             {0} },
+	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_S,          spawn,            {.v = screenshots} },
 
     TAGKEYS(          XKB_KEY_1, XKB_KEY_exclam,                     0),
 	TAGKEYS(          XKB_KEY_2, XKB_KEY_at,                         1),
