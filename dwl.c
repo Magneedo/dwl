@@ -1,13 +1,17 @@
 /*
  * See LICENSE file for copyright and license details.
  */
+#include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
 #include <libinput.h>
 #include <linux/input-event-codes.h>
 #include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/prctl.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -74,7 +78,7 @@
 #define MAX(A, B)               ((A) > (B) ? (A) : (B))
 #define MIN(A, B)               ((A) < (B) ? (A) : (B))
 #define CLEANMASK(mask)         (mask & ~WLR_MODIFIER_CAPS)
-#define VISIBLEON(C, M)         ((M) && (C)->mon == (M) && ((C)->tags & (M)->tagset[(M)->seltags]) && !(C)->swallowedby)
+#define VISIBLEON(C, M)         ((M) && (C)->mon == (M) && ((C)->tags & (M)->tagset[(M)->seltags]) && !(C)->swallowedby && (!(C)->iscodex || ((C) == codexclient && codexshown)))
 #define LENGTH(X)               (sizeof X / sizeof X[0])
 #define END(A)                  ((A) + LENGTH(A))
 #define TAGMASK                 ((1u << TAGCOUNT) - 1)
@@ -140,6 +144,7 @@ struct Client {
 	uint32_t tags;
 	int isfloating, isurgent, isfullscreen;
 	int isterm, noswallow;
+	int iscodex;
 	uint32_t resize; /* configure serial of a pending resize */
 	pid_t pid;
 	Client *swallowing;  /* client being hidden */
@@ -335,13 +340,16 @@ static void setmon(Client *c, Monitor *m, uint32_t newtags);
 static void setpsel(struct wl_listener *listener, void *data);
 static void setsel(struct wl_listener *listener, void *data);
 static void setup(void);
+static void showcodex(void);
 static void spawn(const Arg *arg);
+static void startcodex(void);
 static void startdrag(struct wl_listener *listener, void *data);
 static void swallow(Client *c, Client *toswallow);
 static void tag(const Arg *arg);
 static void tagmon(const Arg *arg);
 static Client *termforwin(Client *c);
 static void tile(Monitor *m);
+static void togglecodex(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void togglefullscreen(const Arg *arg);
 static void toggleswallow(const Arg *arg);
@@ -364,6 +372,10 @@ static void zoom(const Arg *arg);
 
 /* variables */
 static pid_t child_pid = -1;
+static volatile sig_atomic_t codexpid[2]; /* foreground tmux server, terminal */
+static char codexdir[PATH_MAX], codexsocket[PATH_MAX];
+static Client *codexclient;
+static int codexshown;
 static int locked;
 static void *exclusive_focus;
 static struct wl_display *dpy;
@@ -496,6 +508,7 @@ applyrules(Client *c)
 
 	appid = client_get_appid(c);
 	title = client_get_title(c);
+	c->iscodex = !strcmp(appid, "codex-popup");
 
 	c->pid = client_get_pid(c);
 
@@ -719,12 +732,42 @@ checkidleinhibitor(struct wlr_surface *exclude)
 void
 cleanup(void)
 {
+	sigset_t mask;
+	struct timespec delay = {.tv_nsec = 10000000};
+	int i, j;
+	pid_t pid;
+
 	cleanuplisteners();
 #ifdef XWAYLAND
 	wlr_xwayland_destroy(xwayland);
 	xwayland = NULL;
 #endif
+	/* Reap our children here before removing their private socket directory. */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &mask, NULL);
+	for (i = 0; i < 2; i++) {
+		if ((pid = codexpid[i]) > 0) {
+			kill(pid, SIGTERM);
+			for (j = 0; j < 100; j++) {
+				if (waitpid(pid, NULL, WNOHANG) != 0)
+					break;
+				nanosleep(&delay, NULL);
+			}
+			/* A stuck terminal must not prevent compositor shutdown. */
+			if (j == 100) {
+				kill(pid, SIGKILL);
+				while (waitpid(pid, NULL, 0) < 0 && errno == EINTR);
+			}
+		}
+	}
+	if (codexdir[0]) {
+		unlink(codexsocket);
+		rmdir(codexdir);
+	}
+	sigprocmask(SIG_UNBLOCK, &mask, NULL);
 	wl_display_destroy_clients(dpy);
+
 	if (child_pid > 0) {
 		kill(-child_pid, SIGTERM);
 		waitpid(child_pid, NULL, 0);
@@ -1580,10 +1623,19 @@ gpureset(struct wl_listener *listener, void *data)
 void
 handlesig(int signo)
 {
-	if (signo == SIGCHLD)
-		while (waitpid(-1, NULL, WNOHANG) > 0);
-	else if (signo == SIGINT || signo == SIGTERM)
+	pid_t pid;
+	int saved_errno = errno;
+
+	if (signo == SIGCHLD) {
+		while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
+			if (pid == codexpid[0])
+				codexpid[0] = 0;
+			if (pid == codexpid[1])
+				codexpid[1] = 0;
+		}
+	} else if (signo == SIGINT || signo == SIGTERM)
 		quit(NULL);
+	errno = saved_errno;
 }
 
 void
@@ -1639,7 +1691,8 @@ keybinding(uint32_t mods, xkb_keysym_t sym)
 				&& xkb_keysym_to_lower(sym) == xkb_keysym_to_lower(k->keysym)
 				&& k->func) {
 			k->func(&k->arg);
-			return 1;
+			/* Consume the popup binding without enabling key repeat. */
+			return k->func == togglecodex ? 2 : 1;
 		}
 	}
 	return 0;
@@ -1669,10 +1722,10 @@ keypress(struct wl_listener *listener, void *data)
 	 * attempt to process a compositor keybinding. */
 	if (!locked && event->state == WL_KEYBOARD_KEY_STATE_PRESSED) {
 		for (i = 0; i < nsyms; i++)
-			handled = keybinding(mods, syms[i]) || handled;
+			handled |= keybinding(mods, syms[i]);
 	}
 
-	if (handled && group->wlr_group->keyboard.repeat_info.delay > 0) {
+	if (handled == 1 && group->wlr_group->keyboard.repeat_info.delay > 0) {
 		group->mods = mods;
 		group->keysyms = syms;
 		group->nsyms = nsyms;
@@ -1801,6 +1854,12 @@ mapnotify(struct wl_listener *listener, void *data)
 	/* Insert this client into client lists. */
 	wl_list_insert(&clients, &c->link);
 	wl_list_insert(&fstack, &c->flink);
+	if (c->iscodex) {
+		if (codexclient)
+			client_send_close(c);
+		else
+			codexclient = c;
+	}
 
 	/* Set initial monitor, tags, floating status, and focus:
 	 * we always consider floating, clients that have parent and thus
@@ -1811,6 +1870,12 @@ mapnotify(struct wl_listener *listener, void *data)
 		setmon(c, p->mon, p->tags);
 	} else {
 		applyrules(c);
+	}
+	if (c->iscodex) {
+		if (c == codexclient && codexshown)
+			showcodex();
+		printstatus();
+		return;
 	}
 	printstatus();
 
@@ -2121,7 +2186,7 @@ printstatus(void)
 	wl_list_for_each(m, &mons, link) {
 		occ = urg = 0;
 		wl_list_for_each(c, &clients, link) {
-			if (c->mon != m)
+			if (c->mon != m || (c->iscodex && !codexshown))
 				continue;
 			occ |= c->tags;
 			if (c->isurgent)
@@ -2314,6 +2379,7 @@ run(char *startup_cmd)
 	 * monitor when displayed here */
 	wlr_cursor_warp_closest(cursor, NULL, cursor->x, cursor->y);
 	wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
+	startcodex();
 
 	/* Run the Wayland event loop. This does not return until you exit the
 	 * compositor. Starting the backend rigged up all of the necessary event
@@ -2682,6 +2748,34 @@ setup(void)
 }
 
 void
+showcodex(void)
+{
+	Client *c = codexclient;
+	Monitor *m = selmon;
+	struct wlr_box box;
+
+	if (!c || !m)
+		return;
+	c->tags = m->tagset[m->seltags];
+	setmon(c, m, c->tags);
+	if (c->isfullscreen)
+		setfullscreen(c, 0);
+	setfloating(c, 1);
+	box = m->w;
+	box.width = MAX(1 + 2 * (int)c->bw,
+			(int)((int64_t)box.width * MAX(1, MIN(100, codexwidth)) / 100));
+	box.height = MAX(1 + 2 * (int)c->bw,
+			(int)((int64_t)box.height * MAX(1, MIN(100, codexheight)) / 100));
+	box.x += (m->w.width - box.width) / 2;
+	box.y += (m->w.height - box.height) / 2;
+	resize(c, box, 0);
+	/* Above fullscreen applications, below overlays and the session lock. */
+	wlr_scene_node_reparent(&c->scene->node, layers[LyrFS]);
+	focusclient(c, 1);
+	printstatus();
+}
+
+void
 spawn(const Arg *arg)
 {
 	if (fork() == 0) {
@@ -2690,6 +2784,62 @@ spawn(const Arg *arg)
 		execvp(((char **)arg->v)[0], (char **)arg->v);
 		die("dwl: execvp %s failed:", ((char **)arg->v)[0]);
 	}
+}
+
+void
+startcodex(void)
+{
+	sigset_t mask, oldmask;
+	pid_t pid, parent = getpid();
+	int i, fd;
+
+	if (!codexdir[0]) {
+		if (snprintf(codexdir, sizeof(codexdir), "%s/dwl-codex-XXXXXX",
+				getenv("XDG_RUNTIME_DIR")) >= (int)sizeof(codexdir)
+				|| !mkdtemp(codexdir)) {
+			perror("dwl: Codex runtime directory");
+			codexdir[0] = '\0';
+			return;
+		}
+		if (snprintf(codexsocket, sizeof(codexsocket), "%s/tmux", codexdir)
+				>= (int)sizeof(codexsocket)) {
+			rmdir(codexdir);
+			codexdir[0] = '\0';
+			return;
+		}
+	}
+
+	/* Block SIGCHLD until both tracked PIDs have been stored. */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &mask, &oldmask);
+	for (i = 0; i < 2; i++) {
+		if (codexpid[i] > 0 || (i == 1 && codexclient))
+			continue;
+		if ((pid = fork()) == 0) {
+			sigprocmask(SIG_SETMASK, &oldmask, NULL);
+			signal(SIGTERM, SIG_DFL);
+			signal(SIGINT, SIG_DFL);
+			/* tmux -D stays our child, including when dwl crashes. */
+			if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0 || getppid() != parent)
+				_exit(1);
+			setsid();
+			if ((fd = open("/dev/null", O_RDONLY)) < 0)
+				_exit(1);
+			if (fd != STDIN_FILENO) {
+				dup2(fd, STDIN_FILENO);
+				close(fd);
+			}
+			dup2(STDERR_FILENO, STDOUT_FILENO);
+			execl(codexcmd, codexcmd, i == 0 ? "server" : "window", codexsocket, NULL);
+			die("dwl: exec %s failed:", codexcmd);
+		}
+		if (pid < 0)
+			perror("dwl: Codex fork");
+		else
+			codexpid[i] = pid;
+	}
+	sigprocmask(SIG_SETMASK, &oldmask, NULL);
 }
 
 void
@@ -2710,6 +2860,8 @@ swallow(Client *c, Client *toswallow)
 
 	/* Swallow */
 	if (toswallow) {
+		if (c->iscodex || toswallow->iscodex)
+			return;
 		/* Keep each client in at most one chain, without creating cycles. */
 		if (c == toswallow || c->swallowing || c->swallowedby
 				|| toswallow->swallowedby || !toswallow->mon)
@@ -2851,6 +3003,25 @@ tile(Monitor *m)
 }
 
 void
+togglecodex(const Arg *arg)
+{
+	if (!selmon)
+		return;
+	if (!codexclient) {
+		codexshown = codexpid[1] > 0 ? !codexshown : 1;
+		startcodex();
+	} else if (VISIBLEON(codexclient, selmon)) {
+		codexshown = 0;
+		arrange(codexclient->mon);
+		focusclient(focustop(selmon), 1);
+		printstatus();
+	} else {
+		codexshown = 1;
+		showcodex();
+	}
+}
+
+void
 togglefloating(const Arg *arg)
 {
 	Client *sel = focustop(selmon);
@@ -2949,6 +3120,10 @@ unmapnotify(struct wl_listener *listener, void *data)
 {
 	/* Called when the surface is unmapped, and should no longer be shown. */
 	Client *c = wl_container_of(listener, c, unmap);
+	if (c == codexclient) {
+		codexclient = NULL;
+		codexshown = 0;
+	}
 	if (c == grabc) {
 		cursor_mode = CurNormal;
 		grabc = NULL;

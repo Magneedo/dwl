@@ -70,6 +70,64 @@ effect the next time dwl is executed.
 As in the [dwm] community, we encourage users to share patches they have
 created. Check out the [dwl-patches] repository!
 
+### Persistent Codex popup
+
+`Mod+c` shows and focuses Codex in a centered floating terminal on the selected
+monitor, or hides it if already visible there. From another monitor or tag it
+summons the existing popup. Holding the key does not repeat the toggle. The popup
+cannot participate in automatic or manual swallowing.
+
+dwl starts a fresh Codex CLI in `$HOME` inside a dedicated foreground tmux server
+and starts a hidden foot terminal at session startup. Normal toggles only update
+compositor visibility and focus; the same terminal, Codex process and conversation
+stay alive, and Codex continues working while hidden. The popup appears above
+fullscreen applications, below overlays and the session lock.
+
+Set `codexwidth` and `codexheight` in `config.h` to percentages of the usable
+monitor area. Both default to `100`, covering the entire area left after bars
+and other exclusive surfaces, including the popup's borders. Set both to `80`
+for a centered 80% by 80% popup. dwl clamps percentages to 1–100 and enforces a
+minimum client size; offsets are calculated automatically on the selected
+monitor. Rebuild and restart dwl after changing configuration. `config.def.h`
+supplies defaults and never replaces an existing `config.h`.
+
+The dedicated tmux server enables mouse input, with 50,000 lines of scrollback.
+Without mouse reporting, foot translates the wheel to arrow keys on tmux's
+alternate screen, which navigates Codex prompt history. Codex starts with
+`--no-alt-screen` so its output stays in tmux history. Wheel up enters tmux's
+scrollback; wheel down to the bottom or Escape returns to the prompt. Normal
+typing and arrow keys then go to Codex. No personal foot or tmux settings change.
+
+Install `tmux`, `foot` and `openai-codex`, then build and install dwl as usual.
+`make install` also installs `dwl-codex` into `/usr/local/libexec`; change
+`codexcmd` in `config.h` if using another prefix. Your usual foot server is reused;
+a standalone foot window is used if the server is unavailable. `make check`
+requires Python 3, foot, tmux, wlogout and flock (util-linux). It exercises real
+wheel/keyboard events, geometry, menu locking and popup lifecycle in an isolated
+headless compositor with a disposable busy process in place of Codex. It never
+sends model requests or invokes power actions.
+
+Closing or detaching the terminal preserves Codex; `Mod+c` recreates the terminal.
+If Codex exits or crashes, tmux retains its output and Enter starts a fresh chat.
+If the tmux session or server dies, `Mod+c` recreates it with a fresh chat. A dead
+Codex process cannot retain its live conversation; normal hiding never restarts
+or resumes a saved session. The dedicated server ignores personal tmux settings.
+
+Each dwl instance uses a private, randomly named directory under
+`$XDG_RUNTIME_DIR`, so stale sockets and other tmux sessions are never reused or
+killed. dwl stops its terminal/server children and removes the directory at normal
+shutdown, with a bounded wait for unresponsive children. Linux parent-death
+signals stop these children even if dwl crashes;
+an unused socket directory can remain until the runtime directory is cleaned.
+Startup errors go to dwl's stderr. Codex authentication uses the normal user
+configuration and must already be set up.
+
+`Mod+Escape` opens `wlogout -b 2` under a nonblocking lock in
+`$XDG_RUNTIME_DIR/wlogout.lock`. Rapid repeated presses cannot open another menu.
+The lock is released when wlogout exits, and power-action children do not inherit
+it. The lock file stays in the runtime directory to avoid unlink/reopen races.
+Swaylock uses its existing independent binding.
+
 ## Running dwl
 
 dwl can be run on any of the backends supported by wlroots. This means you can

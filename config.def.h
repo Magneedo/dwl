@@ -23,6 +23,7 @@ static int enableautoswallow = 1;
 static const Rule rules[] = {
     /* app_id  title  tags  isfloat  isterm  noswallow  monitor */
     { "footclient", NULL, 0, 0, 1, 0, -1 },
+	{ "codex-popup", NULL, 0, 1, 0, 1, -1 },
 };
 
 /* layout(s) */
@@ -104,10 +105,14 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
 
 /* commands */
+/* Codex popup size as a percentage of the usable monitor area (1-100). */
+static const unsigned int codexwidth = 100;
+static const unsigned int codexheight = 100;
+static const char *codexcmd          = "/usr/local/libexec/dwl-codex";
 static const char *term[]            = { "footclient", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
 static const char *brave[]           = { "brave-origin", NULL };
-static const char *wlogoutcmd[]      = { "wlogout", "-b", "2", NULL };
+static const char *wlogoutcmd[]      = { "sh", "-c", "exec flock -n -E 0 -o \"${XDG_RUNTIME_DIR:?}/wlogout.lock\" wlogout -b 2", NULL };
 static const char *swaylockcmd[]     = { "swaylock", NULL };
 static const char *br_down[]         = { "brightnessctl", "-q", "set",     "1%-",        NULL };
 static const char *br_up[]           = { "brightnessctl", "-q", "set",     "1%+",        NULL };
@@ -121,6 +126,7 @@ static const char *screenshots[]     = { "/home/bren/.local/bin/screenshots", NU
 static const Key keys[] = {
 	/* modifier                  key                 function          argument */
 	{ MODKEY,                    XKB_KEY_Return,     spawn,            {.v = term} },
+	{ MODKEY,                    XKB_KEY_c,          togglecodex,      {0} },
 	{ MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
 	{ MODKEY,                    XKB_KEY_b,          spawn,            {.v = brave} },
 	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = wlogoutcmd } },

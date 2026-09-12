@@ -17,10 +17,14 @@ DWLCFLAGS = `$(PKG_CONFIG) --cflags $(PKGS)` $(WLR_INCS) $(DWLCPPFLAGS) $(DWLDEV
 LDLIBS    = `$(PKG_CONFIG) --libs $(PKGS)` $(WLR_LIBS) -lm $(LIBS)
 
 all: dwl
-check: tests/swallow
+check: tests/swallow tests/codex
 	./tests/swallow
+	sh -n dwl-codex
+	python3 tests/codex.py
 tests/swallow: tests/swallow.c dwl.o util.o
 	$(CC) $(CPPFLAGS) $(DWLCFLAGS) $(LDFLAGS) tests/swallow.c util.o $(LDLIBS) -o $@
+tests/codex: tests/codex.c dwl.o util.o
+	$(CC) $(CPPFLAGS) $(DWLCFLAGS) $(LDFLAGS) tests/codex.c util.o $(LDLIBS) -o $@
 dwl: dwl.o util.o
 	$(CC) dwl.o util.o $(DWLCFLAGS) $(LDFLAGS) $(LDLIBS) -o $@
 dwl.o: dwl.c client.h util.h config.h config.mk cursor-shape-v1-protocol.h \
@@ -53,12 +57,13 @@ xdg-shell-protocol.h:
 config.h:
 	cp config.def.h $@
 clean:
-	rm -f dwl *.o *-protocol.h tests/swallow
+	rm -f dwl *.o *-protocol.h tests/swallow tests/codex
 
 dist: clean
 	mkdir -p dwl-$(VERSION)
-	cp -R Makefile CHANGELOG.md README.md client.h config.def.h \
-		config.mk protocols tests dwl.1 dwl.c util.c util.h dwl.desktop \
+	cp -R Makefile CHANGELOG.md README.md LICENSE LICENSE.dwm \
+		LICENSE.sway LICENSE.tinywl client.h config.def.h config.mk \
+		protocols tests dwl.1 dwl.c dwl-codex util.c util.h dwl.desktop \
 		dwl-$(VERSION)
 	tar -caf dwl-$(VERSION).tar.gz dwl-$(VERSION)
 	rm -rf dwl-$(VERSION)
@@ -68,9 +73,13 @@ install: dwl
 	rm -f $(DESTDIR)$(PREFIX)/bin/dwl
 	cp -f dwl $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/dwl
+	mkdir -p $(DESTDIR)$(PREFIX)/libexec
+	cp -f dwl-codex $(DESTDIR)$(PREFIX)/libexec/dwl-codex
+	chmod 755 $(DESTDIR)$(PREFIX)/libexec/dwl-codex
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/dwl
+	rm -f $(DESTDIR)$(PREFIX)/libexec/dwl-codex
 
 .SUFFIXES: .c .o
 .c.o:
