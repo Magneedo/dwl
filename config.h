@@ -5,7 +5,7 @@
 /* appearance */
 static const int sloppyfocus               = 1;  /* focus follows mouse */
 static const int bypass_surface_visibility = 0;  /* 1 means idle inhibitors will disable idle tracking even if it's surface isn't visible  */
-static const unsigned int borderpx         = 2;  /* border pixel of windows */
+static const unsigned int borderpx         = 3;  /* border pixel of windows */
 static const float rootcolor[]             = COLOR(0x222222ff);
 static const float bordercolor[]           = COLOR(0x444444ff);
 static const float focuscolor[]            = COLOR(0x005577ff);
@@ -106,8 +106,8 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 
 /* commands */
 /* Codex popup size as a percentage of the usable monitor area (1-100). */
-static const unsigned int codexwidth = 100;
-static const unsigned int codexheight = 100;
+static const unsigned int codexwidth = 70;
+static const unsigned int codexheight = 70;
 static const char *codexcmd          = "/usr/local/libexec/dwl-codex";
 static const char *term[]            = { "footclient", NULL };
 static const char *lf[]              = { "footclient", "lf", NULL };
