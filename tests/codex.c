@@ -33,6 +33,10 @@ command(int fd, uint32_t mask, void *data)
 	case 'w':
 		keybinding(MODKEY, XKB_KEY_Escape);
 		break;
+	case '.':
+		if (keybinding(MODKEY, XKB_KEY_period) != 1)
+			abort();
+		break;
 	case '+':
 	case '-':
 		if (!codexclient)
@@ -46,7 +50,10 @@ command(int fd, uint32_t mask, void *data)
 	case 'e':
 	case 'i':
 	case 'p':
-		count = key == 'e' ? KEY_ESC : key == 'i' ? KEY_A : KEY_UP;
+	case 'r':
+		count = key == 'e' ? KEY_ESC : key == 'i' ? KEY_A
+				: key == 'r' ? KEY_ENTER : KEY_UP;
+		wlr_seat_set_keyboard(seat, data);
 		wlr_seat_keyboard_notify_key(seat, 0, count, WL_KEYBOARD_KEY_STATE_PRESSED);
 		wlr_seat_keyboard_notify_key(seat, 0, count, WL_KEYBOARD_KEY_STATE_RELEASED);
 		break;
@@ -55,8 +62,10 @@ command(int fd, uint32_t mask, void *data)
 			abort();
 		break;
 	case 'm':
-		arg.i = WLR_DIRECTION_RIGHT;
-		focusmon(&arg);
+	case 'M':
+		if (keybinding(MODKEY|WLR_MODIFIER_CTRL,
+				key == 'm' ? XKB_KEY_period : XKB_KEY_comma) != 1)
+			abort();
 		break;
 	case 'b':
 		/* Emulate the usable area left by an exclusive top bar. */
@@ -106,6 +115,7 @@ command(int fd, uint32_t mask, void *data)
 			"\"floating\":%d,\"noswallow\":%d,\"selected\":%d,"
 			"\"socket\":\"%s\",\"display\":\"%s\",\"layer\":%d,"
 			"\"normal\":%d,\"normalfull\":%d,\"normalfocused\":%d,\"foot\":%d,"
+			"\"menufocused\":%d,"
 			"\"geometry\":[%d,%d,%d,%d],\"usable\":[%d,%d,%d,%d],"
 			"\"size\":[%u,%u],\"border\":%u}\n",
 			(int)codexpid[0], (int)codexpid[1], count, codexshown,
@@ -116,7 +126,8 @@ command(int fd, uint32_t mask, void *data)
 			c && c->scene->node.parent == layers[LyrFS], normal != NULL,
 			normal && normal->isfullscreen,
 			normal && seat->keyboard_state.focused_surface == client_surface(normal),
-			(int)child_pid, c ? c->geom.x : 0, c ? c->geom.y : 0,
+			(int)child_pid, exclusive_focus != NULL,
+			c ? c->geom.x : 0, c ? c->geom.y : 0,
 			c ? c->geom.width : 0, c ? c->geom.height : 0,
 			selmon->w.x, selmon->w.y, selmon->w.width, selmon->w.height,
 			codexwidth, codexheight, c ? c->bw : 0);
@@ -147,7 +158,7 @@ main(int argc, char **argv)
 	wlr_seat_set_keyboard(seat, &keyboard);
 	wlr_seat_set_capabilities(seat, WL_SEAT_CAPABILITY_POINTER | WL_SEAT_CAPABILITY_KEYBOARD);
 	input = wl_event_loop_add_fd(event_loop, STDIN_FILENO,
-			WL_EVENT_READABLE, command, NULL);
+			WL_EVENT_READABLE, command, &keyboard);
 	run("exec foot --server --log-level=error");
 	wl_event_source_remove(input);
 	wlr_keyboard_finish(&keyboard);

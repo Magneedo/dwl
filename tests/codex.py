@@ -55,7 +55,11 @@ while True:
     time.sleep(.02)
 ''')
     program.chmod(0o755)
+    (root / 'tofi').mkdir()
+    (root / 'tofi/emoji').write_text('font = Noto Sans\n')
+    (root / 'tofi/characters.txt').write_text('👩‍💻\ttechnologist\nα\talpha\n')
     env = dict(os.environ, HOME=temporary, XDG_CONFIG_HOME=temporary,
+               XDG_DATA_HOME=temporary,
                XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS='headless',
                WLR_HEADLESS_OUTPUTS='2', WLR_RENDERER='pixman',
                PATH=temporary + ':' + os.environ['PATH'])
@@ -87,7 +91,7 @@ while True:
         found = []
         for proc in Path('/proc').glob('[0-9]*'):
             try:
-                if (proc / 'comm').read_text().strip() == 'wlogout' and (
+                if (proc / 'comm').read_text().strip() == 'tofi' and (
                         b'XDG_RUNTIME_DIR=' + os.fsencode(runtime)) in (proc / 'environ').read_bytes().split(b'\0'):
                     found.append(int(proc.name))
             except (FileNotFoundError, PermissionError, ProcessLookupError):
@@ -144,8 +148,18 @@ while True:
             assert state['floating'] and state['noswallow']
             assert tmux('show-options', '-gv', 'mouse') == 'on'
             assert tmux('show-options', '-gv', 'status') == 'off'
+            clipboard_env = dict(env, WAYLAND_DISPLAY=state['display'])
 
-            # Exercise the configured binding and actual wlogout, including its
+            def clipboard():
+                return subprocess.check_output(
+                    ['wl-paste', '--no-newline'], env=clipboard_env, timeout=2)
+
+            send('m')
+            waitstate(selected=0)
+            send('M')
+            waitstate(selected=1)
+
+            # Exercise the configured binding and actual tofi, including its
             # startup race and lock release. Never invoke a power action.
             for _ in range(2):
                 send('w' * 100)
@@ -157,7 +171,44 @@ while True:
                 os.kill(menus()[0], signal.SIGTERM)
                 eventually(lambda: not menus())
                 eventually(lambda: subprocess.run(
-                    ['flock', '-n', str(runtime / 'wlogout.lock'), 'true']).returncode == 0)
+                    ['flock', '-n', str(runtime / 'tofi-power.lock'), 'true']).returncode == 0)
+
+            # A ZWJ sequence must reach the focused terminal and clipboard intact,
+            # without its search label, using the actual picker and wtype.
+            send('t')
+            waitstate(visible=1, focused=1)
+            before_input = input_bytes()
+            subprocess.run(['wl-copy', '--type', 'text/plain;charset=utf-8'],
+                           input=b'unchanged', env=clipboard_env, check=True)
+            send('.' * 100)
+            waitstate(menufocused=1)
+            assert len(menus()) == 1
+            send('.' * 20)
+            waitstate(menufocused=1)
+            assert len(menus()) == 1
+            send('r')
+            waitstate(menufocused=0)
+            eventually(lambda: clipboard() == '👩‍💻'.encode())
+            eventually(lambda: input_bytes() == before_input + '👩‍💻'.encode())
+            eventually(lambda: subprocess.run(
+                ['flock', '-n', str(runtime / 'tofi-emoji.lock'), 'true']).returncode == 0)
+            send('.')
+            waitstate(menufocused=1)
+            send('ir')
+            waitstate(menufocused=0)
+            eventually(lambda: clipboard() == 'α'.encode())
+            eventually(lambda: input_bytes() == before_input + '👩‍💻α'.encode())
+            before_input = input_bytes()
+            send('.')
+            waitstate(menufocused=1)
+            send('e')
+            waitstate(menufocused=0)
+            eventually(lambda: not menus())
+            assert clipboard() == 'α'.encode()
+            time.sleep(.2)
+            assert input_bytes() == before_input
+            send('t')
+            waitstate(visible=0)
 
             send('n')
             waitstate(normal=1, normalfocused=1, visible=0)
@@ -311,7 +362,7 @@ while True:
             send('q')
             assert process.wait(timeout=5) == 0
             assert not Path(state['socket']).parent.exists()
-            print('Codex popup lifecycle, scrolling, geometry and wlogout integration tests passed')
+            print('Codex popup lifecycle, scrolling, geometry and tofi menu/clipboard integration tests passed')
         except BaseException:
             log.seek(0)
             print(log.read())
