@@ -102,10 +102,11 @@ Install `tmux`, `foot` and `openai-codex`, then build and install dwl as usual.
 `make install` also installs `dwl-codex` into `/usr/local/libexec`; change
 `codexcmd` in `config.h` if using another prefix. Your usual foot server is reused;
 a standalone foot window is used if the server is unavailable. `make check`
-requires Python 3, foot, tmux, wlogout and flock (util-linux). It exercises real
-wheel/keyboard events, geometry, menu locking and popup lifecycle in an isolated
-headless compositor with a disposable busy process in place of Codex. It never
-sends model requests or invokes power actions.
+requires Python 3, foot, tmux, tofi, tofi-power, tofi-emoji, wl-clipboard, wtype and
+flock (util-linux). It exercises real wheel/keyboard events, geometry, menu locking,
+Unicode insertion and popup lifecycle in an isolated headless compositor with
+a disposable busy process in place of Codex. It never sends model requests or
+invokes power actions.
 
 Closing or detaching the terminal preserves Codex; `Mod+c` recreates the terminal.
 If Codex exits or crashes, tmux retains its output and Enter starts a fresh chat.
@@ -122,11 +123,24 @@ an unused socket directory can remain until the runtime directory is cleaned.
 Startup errors go to dwl's stderr. Codex authentication uses the normal user
 configuration and must already be set up.
 
-`Mod+Escape` opens `wlogout -b 2` under a nonblocking lock in
-`$XDG_RUNTIME_DIR/wlogout.lock`. Rapid repeated presses cannot open another menu.
-The lock is released when wlogout exits, and power-action children do not inherit
-it. The lock file stays in the runtime directory to avoid unlink/reopen races.
-Swaylock uses its existing independent binding.
+`Mod+Escape` opens `tofi-power`, installed from the dotfiles into
+`~/.local/bin` (which must be on `PATH`). The menu offers `lock`, `hibernate`,
+`reboot` and `poweroff` using the existing action helpers and the tofi theme.
+Type to filter, press Enter to select, or Escape to cancel. A nonblocking lock
+in `$XDG_RUNTIME_DIR/tofi-power.lock` prevents repeated presses from opening
+another menu. The lock is released when tofi exits, before dispatching the
+selected action, and action children do not inherit it. The lock file stays
+in the runtime directory to avoid unlink/reopen races. Swaylock uses its
+existing independent binding.
+
+`Mod+period` opens `tofi-emoji`, installed from the dotfiles into `~/.local/bin`.
+Type to search emoji, characters and symbols by name, then press Enter to insert
+the selected character or emoji sequence into the previously focused application.
+The selection also stays in the clipboard. Escape cancels without typing or
+changing the clipboard. The picker uses wtype for insertion, the installed Noto
+fonts for display, and prevents duplicate menus while open.
+Monitor focus is on `Mod+Ctrl+comma` and `Mod+Ctrl+period`; moving a window between
+monitors remains on `Mod+Shift+comma` and `Mod+Shift+period`.
 
 ## Running dwl
 

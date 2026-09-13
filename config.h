@@ -104,16 +104,19 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 /* helper for spawning shell commands in the pre dwm-5.0 fashion */
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
 
-/* commands */
+
 /* Codex popup size as a percentage of the usable monitor area (1-100). */
 static const unsigned int codexwidth = 70;
 static const unsigned int codexheight = 70;
+
+/* commands */
 static const char *codexcmd          = "/usr/local/libexec/dwl-codex";
 static const char *term[]            = { "footclient", NULL };
 static const char *lf[]              = { "footclient", "lf", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
 static const char *brave[]           = { "brave-origin", NULL };
-static const char *wlogoutcmd[]      = { "sh", "-c", "exec flock -n -E 0 -o \"${XDG_RUNTIME_DIR:?}/wlogout.lock\" wlogout -b 2", NULL };
+static const char *powercmd[]        = { "tofi-power", NULL };
+static const char *emojicmd[]        = { "tofi-emoji", NULL };
 static const char *swaylockcmd[]     = { "swaylock", NULL };
 static const char *br_down[]         = { "brightnessctl", "-q", "set",     "1%-",        NULL };
 static const char *br_up[]           = { "brightnessctl", "-q", "set",     "1%+",        NULL };
@@ -131,7 +134,8 @@ static const Key keys[] = {
     { MODKEY,                    XKB_KEY_e,          spawn,            {.v = lf} },
     { MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
 	{ MODKEY,                    XKB_KEY_b,          spawn,            {.v = brave} },
-	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = wlogoutcmd } },
+	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = powercmd } },
+	{ MODKEY,                    XKB_KEY_period,     spawn,            {.v = emojicmd} },
     { MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_L,          spawn,            {.v = swaylockcmd } },
     { MODKEY,                    XKB_KEY_j,          focusstack,       {.i = +1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,       {.i = -1} },
@@ -144,8 +148,8 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_f,          togglefullscreen, {0} },
 	{ MODKEY,                    XKB_KEY_0,          view,             {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,              {.ui = ~0} },
-	{ MODKEY,                    XKB_KEY_comma,      focusmon,         {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY,                    XKB_KEY_period,     focusmon,         {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  XKB_KEY_comma,      focusmon,         {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY|WLR_MODIFIER_CTRL,  XKB_KEY_period,     focusmon,         {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,       tagmon,           {.i = WLR_DIRECTION_LEFT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_greater,    tagmon,           {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          quit,             {0} },
