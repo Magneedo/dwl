@@ -133,13 +133,13 @@ selected action, and action children do not inherit it. The lock file stays
 in the runtime directory to avoid unlink/reopen races. Swaylock uses its
 existing independent binding.
 
-`Mod+period` opens `tofi-emoji`, installed from the dotfiles into `~/.local/bin`.
+`Mod+grave` opens `tofi-emoji`, installed from the dotfiles into `~/.local/bin`.
 Type to search emoji, characters and symbols by name, then press Enter to insert
 the selected character or emoji sequence into the previously focused application.
 The selection also stays in the clipboard. Escape cancels without typing or
 changing the clipboard. The picker uses wtype for insertion, the installed Noto
 fonts for display, and prevents duplicate menus while open.
-Monitor focus is on `Mod+Ctrl+comma` and `Mod+Ctrl+period`; moving a window between
+Monitor focus is on `Mod+comma` and `Mod+period`; moving a window between
 monitors remains on `Mod+Shift+comma` and `Mod+Shift+period`.
 
 ## Running dwl

@@ -34,7 +34,7 @@ command(int fd, uint32_t mask, void *data)
 		keybinding(MODKEY, XKB_KEY_Escape);
 		break;
 	case '.':
-		if (keybinding(MODKEY, XKB_KEY_period) != 1)
+		if (keybinding(MODKEY, XKB_KEY_grave) != 1)
 			abort();
 		break;
 	case '+':
@@ -63,7 +63,7 @@ command(int fd, uint32_t mask, void *data)
 		break;
 	case 'm':
 	case 'M':
-		if (keybinding(MODKEY|WLR_MODIFIER_CTRL,
+		if (keybinding(MODKEY,
 				key == 'm' ? XKB_KEY_period : XKB_KEY_comma) != 1)
 			abort();
 		break;

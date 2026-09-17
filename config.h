@@ -13,7 +13,7 @@ static const float urgentcolor[]           = COLOR(0xff0000ff);
 static const float fullscreen_bg[]         = {0.1f, 0.1f, 0.1f, 1.0f}; /* You can also use glsl colors */
 
 /* tagging - TAGCOUNT must be no greater than 31 */
-#define TAGCOUNT (5)
+#define TAGCOUNT (9)
 
 /* logging */
 static int log_level = WLR_ERROR;
@@ -135,7 +135,7 @@ static const Key keys[] = {
     { MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
 	{ MODKEY,                    XKB_KEY_b,          spawn,            {.v = brave} },
 	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = powercmd } },
-	{ MODKEY,                    XKB_KEY_period,     spawn,            {.v = emojicmd} },
+	{ MODKEY,                    XKB_KEY_grave,      spawn,            {.v = emojicmd} },
     { MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_L,          spawn,            {.v = swaylockcmd } },
     { MODKEY,                    XKB_KEY_j,          focusstack,       {.i = +1} },
 	{ MODKEY,                    XKB_KEY_k,          focusstack,       {.i = -1} },
@@ -148,8 +148,8 @@ static const Key keys[] = {
 	{ MODKEY,                    XKB_KEY_f,          togglefullscreen, {0} },
 	{ MODKEY,                    XKB_KEY_0,          view,             {.ui = ~0} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,              {.ui = ~0} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  XKB_KEY_comma,      focusmon,         {.i = WLR_DIRECTION_LEFT} },
-	{ MODKEY|WLR_MODIFIER_CTRL,  XKB_KEY_period,     focusmon,         {.i = WLR_DIRECTION_RIGHT} },
+	{ MODKEY,                    XKB_KEY_comma,      focusmon,         {.i = WLR_DIRECTION_LEFT} },
+	{ MODKEY,                    XKB_KEY_period,     focusmon,         {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,       tagmon,           {.i = WLR_DIRECTION_LEFT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_greater,    tagmon,           {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Q,          quit,             {0} },
@@ -160,6 +160,10 @@ static const Key keys[] = {
 	TAGKEYS(          XKB_KEY_3, XKB_KEY_numbersign,                 2),
 	TAGKEYS(          XKB_KEY_4, XKB_KEY_dollar,                     3),
 	TAGKEYS(          XKB_KEY_5, XKB_KEY_percent,                    4),
+	TAGKEYS(          XKB_KEY_6, XKB_KEY_asciicircum,                5),
+	TAGKEYS(          XKB_KEY_7, XKB_KEY_ampersand,                  6),
+	TAGKEYS(          XKB_KEY_8, XKB_KEY_asterisk,                   7),
+	TAGKEYS(          XKB_KEY_9, XKB_KEY_parenleft,                  8),
 
     { 0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = br_down} },
 	{ 0, XKB_KEY_XF86MonBrightnessUp,   spawn, {.v = br_up} },
