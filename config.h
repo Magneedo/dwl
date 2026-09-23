@@ -110,7 +110,7 @@ static const unsigned int codexwidth = 70;
 static const unsigned int codexheight = 70;
 
 /* commands */
-static const char *codexcmd          = "/usr/local/libexec/dwl-codex";
+static const char *codexcmd          = "dwl-codex";
 static const char *term[]            = { "footclient", NULL };
 static const char *lf[]              = { "footclient", "lf", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };

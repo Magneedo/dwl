@@ -73,13 +73,17 @@ install: dwl
 	rm -f $(DESTDIR)$(PREFIX)/bin/dwl
 	cp -f dwl $(DESTDIR)$(PREFIX)/bin
 	chmod 755 $(DESTDIR)$(PREFIX)/bin/dwl
-	mkdir -p $(DESTDIR)$(PREFIX)/libexec
-	cp -f dwl-codex $(DESTDIR)$(PREFIX)/libexec/dwl-codex
-	chmod 755 $(DESTDIR)$(PREFIX)/libexec/dwl-codex
+
+install-codex:
+	mkdir -p "$(DESTDIR)$(PREFIX)/bin"
+	cp -f dwl-codex "$(DESTDIR)$(PREFIX)/bin/dwl-codex"
+	chmod 755 "$(DESTDIR)$(PREFIX)/bin/dwl-codex"
 
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/dwl
-	rm -f $(DESTDIR)$(PREFIX)/libexec/dwl-codex
+
+uninstall-codex:
+	rm -f "$(DESTDIR)$(PREFIX)/bin/dwl-codex"
 
 .SUFFIXES: .c .o
 .c.o:

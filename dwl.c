@@ -2831,7 +2831,7 @@ startcodex(void)
 				close(fd);
 			}
 			dup2(STDERR_FILENO, STDOUT_FILENO);
-			execl(codexcmd, codexcmd, i == 0 ? "server" : "window", codexsocket, NULL);
+			execlp(codexcmd, codexcmd, i == 0 ? "server" : "window", codexsocket, NULL);
 			die("dwl: exec %s failed:", codexcmd);
 		}
 		if (pid < 0)

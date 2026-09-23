@@ -33,6 +33,8 @@ def alive(pid):
 with tempfile.TemporaryDirectory(prefix='dwl-codex-test-') as temporary:
     root = Path(temporary)
     (root / 'Vault').mkdir()
+    subprocess.run(['make', 'install-codex', 'PREFIX=' + str(root / '.local')],
+                   cwd=REPO, check=True)
     runtime = root / 'runtime'
     runtime.mkdir(mode=0o700)
     program = root / 'codex'
@@ -67,7 +69,7 @@ while True:
                XDG_DATA_HOME=temporary,
                XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS='headless',
                WLR_HEADLESS_OUTPUTS='2', WLR_RENDERER='pixman',
-               PATH=temporary + ':' + os.environ['PATH'])
+               PATH=str(root / '.local/bin') + ':' + temporary + ':' + os.environ['PATH'])
     env.pop('WAYLAND_DISPLAY', None)
     env.pop('DISPLAY', None)
     env.pop('TMUX', None)
@@ -112,7 +114,7 @@ while True:
         assert (x, y) == (mx + (mw - width) // 2, my + (mh - height) // 2), s
 
     with (root / 'log').open('w+') as log:
-        process = subprocess.Popen([str(REPO / 'tests/codex'), str(REPO / 'dwl-codex')],
+        process = subprocess.Popen([str(REPO / 'tests/codex')],
                                    env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=log, bufsize=0)
         output = bytearray()
@@ -346,7 +348,7 @@ while True:
             assert not Path(state['socket']).parent.exists()
 
             previous_socket = state['socket']
-            process = subprocess.Popen([str(REPO / 'tests/codex'), str(REPO / 'dwl-codex')],
+            process = subprocess.Popen([str(REPO / 'tests/codex')],
                                        env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                        stderr=log, bufsize=0)
             output.clear()
@@ -361,7 +363,7 @@ while True:
             # A new compositor ignores a stale socket left by the killed one.
             previous_socket = state['socket']
             assert Path(previous_socket).is_socket()
-            process = subprocess.Popen([str(REPO / 'tests/codex'), str(REPO / 'dwl-codex')],
+            process = subprocess.Popen([str(REPO / 'tests/codex')],
                                        env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                        stderr=log, bufsize=0)
             output.clear()
