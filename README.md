@@ -77,7 +77,7 @@ monitor, or hides it if already visible there. From another monitor or tag it
 summons the existing popup. Holding the key does not repeat the toggle. The popup
 cannot participate in automatic or manual swallowing.
 
-dwl starts a fresh Codex CLI in `$HOME/Vault` inside a dedicated foreground tmux server
+dwl starts a fresh Codex CLI in `$HOME/Vault/Agents` inside a dedicated foreground tmux server
 and starts a hidden foot terminal at session startup. Normal toggles only update
 compositor visibility and focus; the same terminal, Codex process and conversation
 stay alive, and Codex continues working while hidden. The popup appears above
@@ -98,7 +98,7 @@ alternate screen, which navigates Codex prompt history. Codex starts with
 scrollback; wheel down to the bottom or Escape returns to the prompt. Normal
 typing and arrow keys then go to Codex. No personal foot or tmux settings change.
 
-Install `tmux`, `foot` and `openai-codex`, ensure `~/Vault` exists, then build and
+Install `tmux`, `foot` and `openai-codex`, ensure `~/Vault/Agents` exists, then build and
 install dwl as usual.
 Install the popup helper as your normal user with
 `make install-codex PREFIX="$HOME/.local"`. dwl finds `dwl-codex` through `PATH`,
