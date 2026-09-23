@@ -100,8 +100,12 @@ typing and arrow keys then go to Codex. No personal foot or tmux settings change
 
 Install `tmux`, `foot` and `openai-codex`, ensure `~/Vault` exists, then build and
 install dwl as usual.
-`make install` also installs `dwl-codex` into `/usr/local/libexec`; change
-`codexcmd` in `config.h` if using another prefix. Your usual foot server is reused;
+Install the popup helper as your normal user with
+`make install-codex PREFIX="$HOME/.local"`. dwl finds `dwl-codex` through `PATH`,
+so `~/.local/bin` must be on the login session's path. `make install` installs
+only dwl; helper updates do not require privileges or a compositor rebuild.
+Remove the helper with `make uninstall-codex PREFIX="$HOME/.local"`.
+Your usual foot server is reused;
 a standalone foot window is used if the server is unavailable. `make check`
 requires Python 3, foot, tmux, tofi, tofi-power, tofi-emoji, wl-clipboard, wtype and
 flock (util-linux). It exercises real wheel/keyboard events, geometry, menu locking,

@@ -108,7 +108,7 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 /* Codex popup size as a percentage of the usable monitor area (1-100). */
 static const unsigned int codexwidth = 100;
 static const unsigned int codexheight = 100;
-static const char *codexcmd          = "/usr/local/libexec/dwl-codex";
+static const char *codexcmd          = "dwl-codex";
 static const char *term[]            = { "footclient", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
 static const char *brave[]           = { "brave-origin", NULL };

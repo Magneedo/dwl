@@ -139,7 +139,7 @@ command(int fd, uint32_t mask, void *data)
 }
 
 int
-main(int argc, char **argv)
+main(void)
 {
 	struct wl_event_source *input;
 	struct wlr_keyboard keyboard;
@@ -147,11 +147,8 @@ main(int argc, char **argv)
 	struct xkb_keymap *keymap;
 	static const struct wlr_keyboard_impl impl = {.name = "test"};
 
-	if (argc != 2)
-		return 2;
 	response_fd = dup(STDOUT_FILENO);
 	fcntl(response_fd, F_SETFD, FD_CLOEXEC);
-	codexcmd = argv[1];
 	setup();
 	wlr_keyboard_init(&keyboard, &impl, "test");
 	context = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
