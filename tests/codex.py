@@ -32,7 +32,7 @@ def alive(pid):
 
 with tempfile.TemporaryDirectory(prefix='dwl-codex-test-') as temporary:
     root = Path(temporary)
-    (root / 'Vault').mkdir()
+    (root / 'Vault/Agents').mkdir(parents=True)
     subprocess.run(['make', 'install-codex', 'PREFIX=' + str(root / '.local')],
                    cwd=REPO, check=True)
     runtime = root / 'runtime'
@@ -42,7 +42,7 @@ with tempfile.TemporaryDirectory(prefix='dwl-codex-test-') as temporary:
 import os, select, sys, time, tty
 from pathlib import Path
 root = Path(os.environ['HOME'])
-assert Path.cwd() == root / 'Vault'
+assert Path.cwd() == root / 'Vault/Agents'
 assert sys.argv[1:] == ['--no-alt-screen']
 tty.setraw(0)
 with (root / 'starts').open('a') as f:

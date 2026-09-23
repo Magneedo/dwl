@@ -16,7 +16,7 @@ set -g history-limit 50000
 set -g remain-on-exit on
 set -g remain-on-exit-format 'Codex exited (#{pane_dead_status}). Press Enter for a fresh chat.'
 bind -n Enter if -F '#{pane_dead}' 'respawn-pane' 'send-keys Enter'
-new-session -d -s codex -c "$HOME/Vault" -x 100 -y 32 codex --no-alt-screen
+new-session -d -s codex -c "$HOME/Vault/Agents" -x 100 -y 32 codex --no-alt-screen
 EOF
     ;;
 window)
@@ -31,7 +31,7 @@ window)
     done
     # Only the foreground server may create the socket and own Codex.
     if ! tmux -N -S "$socket" has-session -t =codex 2>/dev/null; then
-        tmux -N -S "$socket" new-session -d -s codex -c "$HOME/Vault" -x 100 -y 32 codex --no-alt-screen
+        tmux -N -S "$socket" new-session -d -s codex -c "$HOME/Vault/Agents" -x 100 -y 32 codex --no-alt-screen
     fi
 
     footsocket=${XDG_RUNTIME_DIR:?}/foot-${WAYLAND_DISPLAY:?}.sock
