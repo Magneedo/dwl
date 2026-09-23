@@ -77,7 +77,7 @@ monitor, or hides it if already visible there. From another monitor or tag it
 summons the existing popup. Holding the key does not repeat the toggle. The popup
 cannot participate in automatic or manual swallowing.
 
-dwl starts a fresh Codex CLI in `$HOME` inside a dedicated foreground tmux server
+dwl starts a fresh Codex CLI in `$HOME/Vault` inside a dedicated foreground tmux server
 and starts a hidden foot terminal at session startup. Normal toggles only update
 compositor visibility and focus; the same terminal, Codex process and conversation
 stay alive, and Codex continues working while hidden. The popup appears above
@@ -98,7 +98,8 @@ alternate screen, which navigates Codex prompt history. Codex starts with
 scrollback; wheel down to the bottom or Escape returns to the prompt. Normal
 typing and arrow keys then go to Codex. No personal foot or tmux settings change.
 
-Install `tmux`, `foot` and `openai-codex`, then build and install dwl as usual.
+Install `tmux`, `foot` and `openai-codex`, ensure `~/Vault` exists, then build and
+install dwl as usual.
 `make install` also installs `dwl-codex` into `/usr/local/libexec`; change
 `codexcmd` in `config.h` if using another prefix. Your usual foot server is reused;
 a standalone foot window is used if the server is unavailable. `make check`
@@ -132,6 +133,17 @@ another menu. The lock is released when tofi exits, before dispatching the
 selected action, and action children do not inherit it. The lock file stays
 in the runtime directory to avoid unlink/reopen races. Swaylock uses its
 existing independent binding.
+
+`Mod+Shift+Escape` opens `tofi-power-profile` for `battery saver`, `normal` and
+`performance`. Install the selector from dotfiles into `~/.local/bin` and the
+profile helper and startup/resume hooks with
+`doas ./scripts/install-power-profile` in the dotfiles repository, then install
+dwl with `doas make install`.
+The menu shows the current profile. Normal is restored at boot; manual choices
+survive suspend/hibernation and charger changes. The dotfiles
+`docs/power-profiles.md` documents the Intel settings, scoped doas rules and
+isolated tests. dwl's integration test substitutes a harmless selector to verify
+the binding without changing system power settings.
 
 `Mod+grave` opens `tofi-emoji`, installed from the dotfiles into `~/.local/bin`.
 Type to search emoji, characters and symbols by name, then press Enter to insert

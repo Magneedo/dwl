@@ -33,6 +33,10 @@ command(int fd, uint32_t mask, void *data)
 	case 'w':
 		keybinding(MODKEY, XKB_KEY_Escape);
 		break;
+	case 'P':
+		if (keybinding(MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Escape) != 1)
+			abort();
+		break;
 	case '.':
 		if (keybinding(MODKEY, XKB_KEY_grave) != 1)
 			abort();

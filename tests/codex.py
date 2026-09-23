@@ -32,6 +32,7 @@ def alive(pid):
 
 with tempfile.TemporaryDirectory(prefix='dwl-codex-test-') as temporary:
     root = Path(temporary)
+    (root / 'Vault').mkdir()
     runtime = root / 'runtime'
     runtime.mkdir(mode=0o700)
     program = root / 'codex'
@@ -39,6 +40,7 @@ with tempfile.TemporaryDirectory(prefix='dwl-codex-test-') as temporary:
 import os, select, sys, time, tty
 from pathlib import Path
 root = Path(os.environ['HOME'])
+assert Path.cwd() == root / 'Vault'
 assert sys.argv[1:] == ['--no-alt-screen']
 tty.setraw(0)
 with (root / 'starts').open('a') as f:
@@ -58,6 +60,9 @@ while True:
     (root / 'tofi').mkdir()
     (root / 'tofi/emoji').write_text('font = Noto Sans\n')
     (root / 'tofi/characters.txt').write_text('👩‍💻\ttechnologist\nα\talpha\n')
+    profile_menu = root / 'tofi-power-profile'
+    profile_menu.write_text('#!/bin/sh\nprintf "opened\\n" >> "$HOME/profile-menu"\n')
+    profile_menu.chmod(0o755)
     env = dict(os.environ, HOME=temporary, XDG_CONFIG_HOME=temporary,
                XDG_DATA_HOME=temporary,
                XDG_RUNTIME_DIR=str(runtime), WLR_BACKENDS='headless',
@@ -158,6 +163,10 @@ while True:
             waitstate(selected=0)
             send('M')
             waitstate(selected=1)
+
+            send('P')
+            eventually(lambda: (root / 'profile-menu').exists())
+            assert (root / 'profile-menu').read_text() == 'opened\n'
 
             # Exercise the configured binding and actual tofi, including its
             # startup race and lock release. Never invoke a power action.
