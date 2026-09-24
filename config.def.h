@@ -21,9 +21,9 @@ static int log_level = WLR_ERROR;
 /* swallow */
 static int enableautoswallow = 1;
 static const Rule rules[] = {
-    /* app_id  title  tags  isfloat  isterm  noswallow  monitor */
-    { "footclient", NULL, 0, 0, 1, 0, -1 },
-	{ "codex-popup", NULL, 0, 1, 0, 1, -1 },
+    /* app_id  title  tags  isfloat  isterm  noswallow  monitor  width%  height% */
+    { "footclient", NULL, 0, 0, 1, 0, -1, 0, 0 },
+	{ "codexclaude", NULL, 0, 1, 0, 1, -1, 70, 70 },
 };
 
 /* layout(s) */
@@ -105,11 +105,8 @@ static const enum libinput_config_tap_button_map button_map = LIBINPUT_CONFIG_TA
 #define SHCMD(cmd) { .v = (const char*[]){ "/bin/sh", "-c", cmd, NULL } }
 
 /* commands */
-/* Codex popup size as a percentage of the usable monitor area (1-100). */
-static const unsigned int codexwidth = 100;
-static const unsigned int codexheight = 100;
-static const char *codexcmd          = "dwl-codex";
 static const char *term[]            = { "footclient", NULL };
+static const char *codexclaude[]     = { "codexclaude", NULL };
 static const char *tofi[]            = { "sh", "-c", "tofi-run | xargs -r sh -c", NULL };
 static const char *brave[]           = { "brave-origin", NULL };
 static const char *powercmd[]        = { "tofi-power", NULL };
@@ -128,7 +125,7 @@ static const char *screenshots[]     = { "/home/bren/.local/bin/screenshots", NU
 static const Key keys[] = {
 	/* modifier                  key                 function          argument */
 	{ MODKEY,                    XKB_KEY_Return,     spawn,            {.v = term} },
-	{ MODKEY,                    XKB_KEY_c,          togglecodex,      {0} },
+	{ MODKEY,                    XKB_KEY_c,          spawn,            {.v = codexclaude} },
 	{ MODKEY,                    XKB_KEY_Tab,        spawn,            {.v = tofi} },
 	{ MODKEY,                    XKB_KEY_b,          spawn,            {.v = brave} },
 	{ MODKEY,                    XKB_KEY_Escape,     spawn,            {.v = powercmd } },
