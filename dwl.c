@@ -1404,6 +1404,9 @@ void
 destroykeyboardgroup(struct wl_listener *listener, void *data)
 {
 	KeyboardGroup *group = wl_container_of(listener, group, destroy);
+	/* Don't leave the seat without a keymap when a virtual keyboard goes */
+	if (group != kb_group && wlr_seat_get_keyboard(seat) == &group->wlr_group->keyboard)
+		wlr_seat_set_keyboard(seat, &kb_group->wlr_group->keyboard);
 	wl_event_source_remove(group->key_repeat_source);
 	wl_list_remove(&group->key.link);
 	wl_list_remove(&group->modifiers.link);
