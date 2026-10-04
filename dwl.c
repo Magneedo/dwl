@@ -1404,6 +1404,9 @@ void
 destroykeyboardgroup(struct wl_listener *listener, void *data)
 {
 	KeyboardGroup *group = wl_container_of(listener, group, destroy);
+	/* Don't leave the seat without a keymap when a virtual keyboard goes */
+	if (group != kb_group && wlr_seat_get_keyboard(seat) == &group->wlr_group->keyboard)
+		wlr_seat_set_keyboard(seat, &kb_group->wlr_group->keyboard);
 	wl_event_source_remove(group->key_repeat_source);
 	wl_list_remove(&group->key.link);
 	wl_list_remove(&group->modifiers.link);
@@ -3141,6 +3144,7 @@ virtualkeyboard(struct wl_listener *listener, void *data)
 
 	/* Add the new keyboard to the group */
 	wlr_keyboard_group_add_keyboard(group->wlr_group, &kb->keyboard);
+	wlr_seat_set_capabilities(seat, seat->capabilities | WL_SEAT_CAPABILITY_KEYBOARD);
 }
 
 void
@@ -3152,6 +3156,7 @@ virtualpointer(struct wl_listener *listener, void *data)
 	wlr_cursor_attach_input_device(cursor, device);
 	if (event->suggested_output)
 		wlr_cursor_map_input_to_output(cursor, device, event->suggested_output);
+	wlr_seat_set_capabilities(seat, seat->capabilities | WL_SEAT_CAPABILITY_POINTER);
 }
 
 Monitor *

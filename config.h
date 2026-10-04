@@ -13,7 +13,7 @@ static const float urgentcolor[]           = COLOR(0xff0000ff);
 static const float fullscreen_bg[]         = {0.1f, 0.1f, 0.1f, 1.0f}; /* You can also use glsl colors */
 
 /* tagging - TAGCOUNT must be no greater than 31 */
-#define TAGCOUNT (9)
+#define TAGCOUNT (10)
 
 /* logging */
 static int log_level = WLR_ERROR;
@@ -24,6 +24,7 @@ static const Rule rules[] = {
     /* app_id  title  tags  isfloat  isterm  noswallow  monitor  width%  height% */
     { "footclient", NULL, 0, 0, 1, 0, -1, 0, 0 },
 	{ "codexclaude", NULL, 0, 1, 0, 1, -1, 70, 70 },
+	{ "Vncviewer", NULL, 1 << 9, 0, 0, 0, -1, 0, 0 },
 };
 
 /* layout(s) */
@@ -143,8 +144,6 @@ static const Key keys[] = {
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_Return,     zoom,             {0} },
 	{ MODKEY,                    XKB_KEY_q,          killclient,       {0} },
 	{ MODKEY,                    XKB_KEY_f,          togglefullscreen, {0} },
-	{ MODKEY,                    XKB_KEY_0,          view,             {.ui = ~0} },
-	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_parenright, tag,              {.ui = ~0} },
 	{ MODKEY,                    XKB_KEY_comma,      focusmon,         {.i = WLR_DIRECTION_LEFT} },
 	{ MODKEY,                    XKB_KEY_period,     focusmon,         {.i = WLR_DIRECTION_RIGHT} },
 	{ MODKEY|WLR_MODIFIER_SHIFT, XKB_KEY_less,       tagmon,           {.i = WLR_DIRECTION_LEFT} },
@@ -161,6 +160,7 @@ static const Key keys[] = {
 	TAGKEYS(          XKB_KEY_7, XKB_KEY_ampersand,                  6),
 	TAGKEYS(          XKB_KEY_8, XKB_KEY_asterisk,                   7),
 	TAGKEYS(          XKB_KEY_9, XKB_KEY_parenleft,                  8),
+	TAGKEYS(          XKB_KEY_0, XKB_KEY_parenright,                 9),
 
     { 0, XKB_KEY_XF86MonBrightnessDown, spawn, {.v = br_down} },
 	{ 0, XKB_KEY_XF86MonBrightnessUp,   spawn, {.v = br_up} },
