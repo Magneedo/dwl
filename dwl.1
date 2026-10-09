@@ -186,6 +186,12 @@ The bitmasks are 32-bit unsigned decimal integers.
 Prints the symbol of the current layout.
 .El
 .El
+.Pp
+Each status update ends with a line beginning with
+.Em visible ,
+followed by space-separated application IDs on the selected monitor's
+active tags, including unfocused windows. The list is empty while locked.
+This describes tag visibility, not occlusion by other windows.
 .Ss Examples
 When there is a selected window:
 .Bd -literal -offset indent
@@ -196,6 +202,7 @@ HDMI\-A\-1 floating 0
 HDMI\-A\-1 selmon 1
 HDMI\-A\-1 tags 271 4 4 0
 HDMI\-A\-1 layout [T]
+visible footclient
 .Ed
 .Pp
 When there is no selected window:
@@ -207,6 +214,7 @@ HDMI\-A\-1 floating
 HDMI\-A\-1 selmon 1
 HDMI\-A\-1 tags 271 512 0 0
 HDMI\-A\-1 layout [T]
+visible
 .Ed
 .Sh ENVIRONMENT
 These environment variables are used by

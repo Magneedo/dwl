@@ -655,13 +655,17 @@ buttonpress(struct wl_listener *listener, void *data)
 	uint32_t mods;
 	Client *c;
 	const Button *b;
+	Monitor *m;
 
 	wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
 
 	switch (event->state) {
 	case WL_POINTER_BUTTON_STATE_PRESSED:
 		cursor_mode = CurPressed;
-		selmon = xytomon(cursor->x, cursor->y);
+		if ((m = xytomon(cursor->x, cursor->y)) != selmon) {
+			selmon = m;
+			printstatus();
+		}
 		if (locked)
 			break;
 
@@ -687,7 +691,10 @@ buttonpress(struct wl_listener *listener, void *data)
 			wlr_cursor_set_xcursor(cursor, cursor_mgr, "default");
 			cursor_mode = CurNormal;
 			/* Drop the window off on its new monitor */
-			selmon = xytomon(cursor->x, cursor->y);
+			if ((m = xytomon(cursor->x, cursor->y)) != selmon) {
+				selmon = m;
+				printstatus();
+			}
 			setmon(grabc, selmon, 0);
 			grabc = NULL;
 			return;
@@ -1468,6 +1475,8 @@ focusclient(Client *c, int lift)
 			client_set_border_color(c, focuscolor);
 	}
 
+	printstatus();
+
 	/* Deactivate old client if focus is changing */
 	if (old && (!c || client_surface(c) != old)) {
 		/* If an overlay is focused, don't focus or activate the client,
@@ -1487,7 +1496,6 @@ focusclient(Client *c, int lift)
 			client_activate_surface(old, 0);
 		}
 	}
-	printstatus();
 
 	if (!c) {
 		/* With no client, all we have left is to clear focus */
@@ -1515,6 +1523,7 @@ focusmon(const Arg *arg)
 		while (!selmon->wlr_output->enabled && i++ < nmons);
 	}
 	focusclient(focustop(selmon), 1);
+	printstatus();
 }
 
 void
@@ -1758,6 +1767,7 @@ locksession(struct wl_listener *listener, void *data)
 	lock->scene = wlr_scene_tree_create(layers[LyrBlock]);
 	cur_lock = lock->lock = session_lock;
 	locked = 1;
+	printstatus();
 
 	LISTEN(&session_lock->events.new_surface, &lock->new_surface, createlocksurface);
 	LISTEN(&session_lock->events.destroy, &lock->destroy, destroysessionlock);
@@ -1880,6 +1890,7 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
 	double sx = 0, sy = 0, sx_confined, sy_confined;
 	Client *c = NULL, *w = NULL;
 	LayerSurface *l = NULL;
+	Monitor *m;
 	struct wlr_surface *surface = NULL;
 	struct wlr_pointer_constraint_v1 *constraint;
 
@@ -1912,8 +1923,10 @@ motionnotify(uint32_t time, struct wlr_input_device *device, double dx, double d
 		wlr_idle_notifier_v1_notify_activity(idle_notifier, seat);
 
 		/* Update selmon (even while dragging a window) */
-		if (sloppyfocus)
-			selmon = xytomon(cursor->x, cursor->y);
+		if (sloppyfocus && (m = xytomon(cursor->x, cursor->y)) != selmon) {
+			selmon = m;
+			printstatus();
+		}
 	}
 
 	/* Update drag icon's position */
@@ -2158,6 +2171,13 @@ printstatus(void)
 			m->wlr_output->name, occ, m->tagset[m->seltags], sel, urg);
 		printf("%s layout %s\n", m->wlr_output->name, m->ltsymbol);
 	}
+	/* Application IDs on the selected monitor's visible tags. */
+	printf("visible");
+	wl_list_for_each(c, &clients, link) {
+		if (!locked && VISIBLEON(c, selmon))
+			printf(" %s", client_get_appid(c));
+	}
+	printf("\n");
 	fflush(stdout);
 }
 
